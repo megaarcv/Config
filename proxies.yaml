@@ -1,0 +1,18 @@
+proxies:
+#All Format Akun Clash Silahkan Akses Link Berikut: https://github.com/GboyGud/FORMAT_AKUN_CLASH
+#Ada Pertanyaan Seputar Config? Silahkan Hubungi: https://t.me/AfthonPc
+#Mulai Baris Ini Kebawah Isi Dengan Akun Anda Sendiri
+
+- name: "(ID) Akamai Connected"
+  type: trojan
+  server: ava.game.naver.com
+  port: 443
+  password: aaaaaaa1-bbbb-4ccc-accc-eeeeeeeeeee1
+  skip-cert-verify: true
+  udp: true
+  sni: ava.game.naver.com.free.bansos4u.BIZ.id
+  network: ws
+  ws-opts:
+    path: /Free/TG-at-BitzBlack/172.232.239.151-587
+    headers:
+      Host: ava.game.naver.com.free.bansos4u.BIZ.id
