@@ -1,121 +1,30 @@
 #!/bin/bash
-# Simple Xray + SSH Auto Installer (Tanpa Cek IP)
-# Domain default: simplevpn.my.id
 
-domain="simplevpn.my.id"
+Simple Xray + SSH Auto Installer (Tanpa Cek IP) Domain default: simplevpn.my.id Author: Custom by ChatGPT ========== Konfigurasi Awal ========== 
 
-echo -e "\n========== Setting Awal =========="
-echo "Domain: $domain"
+DOMAIN="simplevpn.my.id" XRAY_PATH=/usr/local/bin/xray XRAY_CONF_DIR=/etc/xray XRAY_CONF=$XRAY_CONF_DIR/config.json UUIDGEN=$(uuidgen)
 
-echo "🛠️ Menginstall dependensi..."
-apt update -y
-apt install -y curl wget unzip socat netcat cron bash-completion
+========== Fungsi Install Xray ========== 
 
-echo "📥 Menginstall Xray Core..."
-mkdir -p /etc/xray /usr/local/share/xray
-cd /tmp
-wget https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip -O xray.zip
-unzip -o xray.zip
-install -m 755 xray /usr/local/bin/xray
-install -m 644 geo* /usr/local/share/xray/
+install_xray() { echo -e "\n[INFO] Mengunduh dan menginstal Xray..." mkdir -p $XRAY_CONF_DIR mkdir -p /usr/local/share/xray cd /tmp curl -L -o xray.zip https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip unzip -o xray.zip install -m 755 xray $XRAY_PATH install -m 644 geoip.dat /usr/local/share/xray/geoip.dat install -m 644 geosite.dat /usr/local/share/xray/geosite.dat
 
-echo "📄 Membuat sertifikat SSL (Let's Encrypt)..."
-systemctl stop nginx 2>/dev/null
-apt install -y certbot
-certbot certonly --standalone --noninteractive --agree-tos -m admin@$domain -d $domain
-mkdir -p /etc/letsencrypt/live/$domain
+Generate config.json awal dengan Trojan TLS 
 
-echo "⚙️ Membuat konfigurasi Xray Trojan TLS..."
-cat <<EOF > /etc/xray/config.json
-{
-  "inbounds": [
-    {
-      "port": 443,
-      "protocol": "trojan",
-      "settings": {
-        "clients": [
-          {
-            "password": "$(uuidgen)"
-          }
-        ]
-      },
-      "streamSettings": {
-        "network": "tcp",
-        "security": "tls",
-        "tlsSettings": {
-          "certificates": [
-            {
-              "certificateFile": "/etc/letsencrypt/live/$domain/fullchain.pem",
-              "keyFile": "/etc/letsencrypt/live/$domain/privkey.pem"
-            }
-          ]
-        }
-      }
-    }
-  ],
-  "outbounds": [
-    {
-      "protocol": "freedom"
-    }
-  ]
-}
-EOF
+cat > $XRAY_CONF << END { "inbounds": [ { "port": 443, "protocol": "trojan", "settings": { "clients": [ { "password": "$UUIDGEN" } ] }, "streamSettings": { "network": "tcp", "security": "tls", "tlsSettings": { "certificates": [ { "certificateFile": "/etc/letsencrypt/live/$DOMAIN/fullchain.pem", "keyFile": "/etc/letsencrypt/live/$DOMAIN/privkey.pem" } ] } } } ], "outbounds": [ { "protocol": "freedom" } ] } END
 
-echo "🔧 Membuat systemd service untuk Xray..."
-cat <<EOF > /etc/systemd/system/xray.service
-[Unit]
-Description=Xray Service
-After=network.target nss-lookup.target
+Setup systemd service 
 
-[Service]
-ExecStart=/usr/local/bin/xray run -config /etc/xray/config.json
-Restart=on-failure
+cat > /etc/systemd/system/xray.service << END [Unit] Description=Xray Service After=network.target
 
-[Install]
-WantedBy=multi-user.target
-EOF
+[Service] ExecStart=$XRAY_PATH run -config $XRAY_CONF Restart=on-failure
 
-systemctl daemon-reexec
-systemctl enable xray
-systemctl start xray
+[Install] WantedBy=multi-user.target END
 
-echo "📦 Menyiapkan menu interaktif..."
-cat <<'EOF' > /usr/bin/menu
-#!/bin/bash
-clear
-echo "========= MENU XRAY VPN ========="
-echo "1. Tambah Akun Trojan"
-echo "2. Lihat Config Aktif"
-echo "3. Restart Xray"
-echo "4. Keluar"
-echo "================================="
-read -p "Pilih opsi [1-4]: " opt
-case $opt in
-  1)
-    read -p "Username: " user
-    uuid=$(uuidgen)
-    sed -i "/clients/a \        {\"password\": \"$uuid\"}," /etc/xray/config.json
-    systemctl restart xray
-    echo -e "\nAkun Trojan berhasil ditambahkan:"
-    echo "trojan://$uuid@$domain:443"
-    ;;
-  2)
-    grep password /etc/xray/config.json | cut -d'"' -f4 | while read line; do
-      echo "trojan://$line@$domain:443"
-    done
-    ;;
-  3)
-    systemctl restart xray && echo "Xray berhasil direstart"
-    ;;
-  4)
-    exit
-    ;;
-  *)
-    echo "Pilihan tidak valid"
-    ;;
-esac
-EOF
+systemctl daemon-reexec systemctl daemon-reload systemctl enable xray systemctl restart xray echo -e "[INFO] Xray berhasil diinstal dan dijalankan." }
 
-chmod +x /usr/bin/menu
+========== Fungsi Buat Akun Trojan ========== 
 
-echo -e "\n✅ Instalasi selesai! Ketik 'menu' untuk mulai mengelola akun."
+buat_trojan() { echo -ne "Masukkan Nama User: "; read user exp_date=$(date -d "+30 days" +"%Y-%m-%d") uuid=$(uuidgen)
+
+sed -i "/clients":
+
