@@ -1,30 +1,100 @@
 #!/bin/bash
+# Simple Xray + SSH Auto Installer (Tanpa Cek IP)
+# Domain default: simplevpn.my.id
+# Author: ChatGPT custom request
 
-Simple Xray + SSH Auto Installer (Tanpa Cek IP) Domain default: simplevpn.my.id Author: Custom by ChatGPT ========== Konfigurasi Awal ========== 
+DOMAIN="simplevpn.my.id"
+XRAY_BIN="/usr/local/bin/xray"
+XRAY_CONFIG="/etc/xray/config.json"
+XRAY_SERVICE="/etc/systemd/system/xray.service"
+XRAY_DIR="/etc/xray"
+SHARE_DIR="/usr/local/share/xray"
 
-DOMAIN="simplevpn.my.id" XRAY_PATH=/usr/local/bin/xray XRAY_CONF_DIR=/etc/xray XRAY_CONF=$XRAY_CONF_DIR/config.json UUIDGEN=$(uuidgen)
+install_xray() {
+    echo "Mengunduh Xray Core..."
+    mkdir -p $SHARE_DIR
+    mkdir -p $XRAY_DIR
+    cd /tmp && curl -LO https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
+    unzip -o Xray-linux-64.zip && install -m 755 xray $XRAY_BIN
+    install -m 644 geoip.dat $SHARE_DIR/geoip.dat
+    install -m 644 geosite.dat $SHARE_DIR/geosite.dat
 
-========== Fungsi Install Xray ========== 
+    echo "Membuat file konfigurasi awal..."
+    UUID=$(uuidgen)
+    cat > $XRAY_CONFIG <<EOF
+{
+  "inbounds": [
+    {
+      "port": 443,
+      "protocol": "trojan",
+      "settings": {
+        "clients": [
+          {
+            "password": "$UUID"
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "tls",
+        "tlsSettings": {
+          "certificates": [
+            {
+              "certificateFile": "/etc/letsencrypt/live/$DOMAIN/fullchain.pem",
+              "keyFile": "/etc/letsencrypt/live/$DOMAIN/privkey.pem"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "protocol": "freedom"
+    }
+  ]
+}
+EOF
 
-install_xray() { echo -e "\n[INFO] Mengunduh dan menginstal Xray..." mkdir -p $XRAY_CONF_DIR mkdir -p /usr/local/share/xray cd /tmp curl -L -o xray.zip https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip unzip -o xray.zip install -m 755 xray $XRAY_PATH install -m 644 geoip.dat /usr/local/share/xray/geoip.dat install -m 644 geosite.dat /usr/local/share/xray/geosite.dat
+    echo "Membuat service systemd untuk Xray..."
+    cat > $XRAY_SERVICE <<EOF
+[Unit]
+Description=Xray Service
+After=network.target
 
-Generate config.json awal dengan Trojan TLS 
+[Service]
+Type=simple
+ExecStart=$XRAY_BIN run -config $XRAY_CONFIG
+Restart=on-failure
 
-cat > $XRAY_CONF << END { "inbounds": [ { "port": 443, "protocol": "trojan", "settings": { "clients": [ { "password": "$UUIDGEN" } ] }, "streamSettings": { "network": "tcp", "security": "tls", "tlsSettings": { "certificates": [ { "certificateFile": "/etc/letsencrypt/live/$DOMAIN/fullchain.pem", "keyFile": "/etc/letsencrypt/live/$DOMAIN/privkey.pem" } ] } } } ], "outbounds": [ { "protocol": "freedom" } ] } END
+[Install]
+WantedBy=multi-user.target
+EOF
 
-Setup systemd service 
+    systemctl daemon-reexec
+    systemctl daemon-reload
+    systemctl enable xray
+    systemctl start xray
 
-cat > /etc/systemd/system/xray.service << END [Unit] Description=Xray Service After=network.target
+    echo "Xray berhasil diinstal dan dijalankan!"
+    echo "UUID: $UUID"
+    echo "Link TLS: trojan://$UUID@$DOMAIN:443"
+}
 
-[Service] ExecStart=$XRAY_PATH run -config $XRAY_CONF Restart=on-failure
+menu() {
+    clear
+    echo -e "=============================="
+    echo -e "     AUTO XRAY INSTALLER     "
+    echo -e "=============================="
+    echo -e "1. Install Xray Trojan TLS"
+    echo -e "0. Exit"
+    echo -n "Pilih opsi: "
+    read pilih
+    case $pilih in
+        1) install_xray ;;
+        0) exit ;;
+        *) echo "Pilihan tidak valid."; sleep 1; menu ;;
+    esac
+}
 
-[Install] WantedBy=multi-user.target END
-
-systemctl daemon-reexec systemctl daemon-reload systemctl enable xray systemctl restart xray echo -e "[INFO] Xray berhasil diinstal dan dijalankan." }
-
-========== Fungsi Buat Akun Trojan ========== 
-
-buat_trojan() { echo -ne "Masukkan Nama User: "; read user exp_date=$(date -d "+30 days" +"%Y-%m-%d") uuid=$(uuidgen)
-
-sed -i "/clients":
-
+menu
